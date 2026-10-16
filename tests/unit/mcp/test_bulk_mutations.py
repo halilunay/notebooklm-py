@@ -258,6 +258,7 @@ GRANTS = [
 
 async def test_share_batch_preview_includes_every_grant_and_call_flags(mcp_call, mock_client):
     """Sharing previews expose all grantees and batch-wide settings without writing."""
+    mock_client.notebooks.list = AsyncMock(return_value=[SimpleNamespace(id=NB, title="Team")])
     result = await mcp_call(
         "share_set_user", {"notebook": NB, "grants": GRANTS, "notify": True, "message": "Welcome"}
     )
@@ -266,6 +267,7 @@ async def test_share_batch_preview_includes_every_grant_and_call_flags(mcp_call,
         "preview": {
             "action": "share_set_user",
             "notebook_id": NB,
+            "title": "Team",
             "grants": GRANTS,
             "notify": True,
             "has_message": True,
@@ -324,6 +326,7 @@ async def test_share_batch_limit_rejects_before_client_open(mcp_call, monkeypatc
 @pytest.mark.parametrize("confirm", [False, True])
 async def test_share_batch_accepts_the_recipient_limit(mcp_call, mock_client, confirm):
     """The maximum supported subset previews in full and confirms with one write."""
+    mock_client.notebooks.list = AsyncMock(return_value=[SimpleNamespace(id=NB, title="Team")])
     grants = [
         {"email": f"recipient-{index}@example.test", "permission": "viewer"} for index in range(100)
     ]

@@ -2209,6 +2209,10 @@ async def test_studio_delete_preview_shows_the_resolved_title(mcp_call, mock_cli
             "title": "İstanbul notları",
         },
     }
+    batch = await mcp_call("studio_delete", {"notebook": NB_ID, "items": ["istanbul"]})
+    assert batch.structured_content["preview"]["items"] == [
+        {"item_id": _ART_FULL, "type": "audio", "title": "İstanbul notları"}
+    ]
     mock_client.artifacts.delete.assert_not_called()
 
 

@@ -49,7 +49,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pick between several titles. The near-miss hints and the download `--name`
   filter use the accent-insensitive key directly. Studio item refs gain the
   title-prefix matching the other resolvers already had. Dotless `ı` still
-  never matches `i`.
+  never matches `i`. The confirmation previews of `share_set_access`,
+  `share_set_user` and `share_remove_user` now include the resolved notebook
+  `title`, as `notebook_delete` already did, so a tier-2 match is visible
+  before anything changes.
 
 ## [0.8.5] - 2026-10-12
 
