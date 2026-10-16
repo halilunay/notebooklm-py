@@ -43,6 +43,7 @@ from ..outcomes import redact_operation_text
 from ..types import ArtifactDownloadListing, ArtifactDownloadRequest, ArtifactDownloadSelection
 from .download_specs import EXTENSION_MIME_TYPES, DownloadTypeSpec
 from .download_specs import FORMAT_EXTENSIONS as FORMAT_EXTENSIONS
+from .resolve import accentless_key
 
 # Reserve space for " (999)" suffix when handling duplicate filenames.
 DUPLICATE_SUFFIX_RESERVE = 7
@@ -337,7 +338,7 @@ def select_artifact(
         artifacts: List of artifact dicts with 'id', 'title', 'created_at'.
         latest: Select most recent (default: True).
         earliest: Select oldest (overrides latest if True).
-        name: Filter by title (case-insensitive substring match).
+        name: Filter by title (case- and accent-insensitive substring match).
         artifact_id: Select by exact artifact ID.
 
     Returns:
@@ -361,8 +362,8 @@ def select_artifact(
         return filtered[0], f"matched by ID: {artifact_id}"
 
     if name:
-        name_lower = name.lower()
-        filtered = [a for a in artifacts if name_lower in a["title"].lower()]
+        name_key = accentless_key(name)
+        filtered = [a for a in artifacts if name_key in accentless_key(a["title"])]
         if not filtered:
             raise ValueError(
                 f"No artifacts matching '{name}'. "
@@ -680,10 +681,10 @@ async def _execute_download_all(
     raw = Path(plan.output_path) if plan.output_path else Path(plan.spec.default_dir)
     output_dir = raw if raw.is_absolute() else plan.cwd / raw
 
-    # --name filter (case-insensitive substring) applied before previewing.
+    # --name filter (case- and accent-insensitive substring) applied before previewing.
     if plan.name:
-        name_lower = plan.name.lower()
-        filtered = [a for a in type_artifacts if name_lower in a["title"].lower()]
+        name_key = accentless_key(plan.name)
+        filtered = [a for a in type_artifacts if name_key in accentless_key(a["title"])]
         if not filtered:
             return DownloadResult(
                 outcome=DownloadOutcome.ERROR,

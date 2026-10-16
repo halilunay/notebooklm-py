@@ -25,6 +25,7 @@ from ..._app.artifacts import require_complete_artifact_listing
 from ..._app.resolve import (
     FULL_ID_PATTERN,
     AmbiguousIdError,
+    match_title,
     resolve_ref,
     validate_id,
 )
@@ -245,11 +246,11 @@ def _match_studio_ref(
     """Match ``ref`` over the merged studio ``items``, honoring a ``kind`` scope.
 
     Matching order mirrors the single-type ``resolve_*`` helpers: full-UUID /
-    exact id / unique hex-prefix (via :func:`resolve_ref`), then exact
-    case-insensitive title (so an all-hex title stays reachable). Returns the
+    exact id / unique hex-prefix (via :func:`resolve_ref`), then the tiered title
+    match of :func:`match_title` (so an all-hex title stays reachable). Returns the
     matched item dict, or ``None`` on a miss (the caller decides whether a miss is
     NOT_FOUND or an idempotent no-op). Raises :class:`AmbiguousIdError` on an
-    ambiguous prefix or title.
+    ambiguous id prefix, title, or title prefix.
     """
     scoped = [it for it in items if kind is None or it["type"] == kind]
     if _HEX_REF.match(ref):
@@ -282,14 +283,13 @@ def _match_studio_ref(
         if FULL_ID_PATTERN.fullmatch(ref):
             return None
         # Fall through to the title path (id/prefix found nothing).
-    ref_folded = ref.casefold()
-    titled = [it for it in scoped if (it.get("title") or "").casefold() == ref_folded]
+    titled, how = match_title(ref, scoped, title_of=lambda it: it.get("title"))
     if len(titled) == 1:
         (match,) = titled  # unpack (not titled[0]) — avoids the positional-index gate
         return match
     if len(titled) > 1:
         candidate_ids = [it["id"] for it in titled]
-        lines = [f"Ambiguous title '{ref}' matches {len(titled)} items:"]
+        lines = [f"Ambiguous {how} '{ref}' matches {len(titled)} items:"]
         for it in titled[:_MAX_AMBIGUOUS_CANDIDATES]:
             lines.append(f"  {it['id'][:12]}... {it.get('title') or '(untitled)'}")
         if len(titled) > _MAX_AMBIGUOUS_CANDIDATES:

@@ -171,6 +171,26 @@ class TestArtifactSelection:
         assert selected["id"] == "a1"
         assert reason == "matched by name"
 
+    @pytest.mark.parametrize("name", ["istanbul", "istanbul notları", "İSTANBUL NOT"])
+    def test_name_filter_dotted_capital_i(self, name):
+        """The --name filter compares accent-insensitive keys (issue #2476)."""
+        artifacts = [
+            {"id": "a1", "title": "İstanbul notları", "created_at": 1000},
+            {"id": "a2", "title": "Overview", "created_at": 2000},
+        ]
+
+        selected, reason = select_artifact(artifacts, name=name)
+
+        assert selected["id"] == "a1"
+        assert reason == "matched by name"
+
+    def test_name_filter_keeps_dotless_i_distinct(self):
+        """Dotless ı is a different letter from i, so it must not match."""
+        artifacts = [{"id": "a1", "title": "ılık çay", "created_at": 1000}]
+
+        with pytest.raises(ValueError, match="No artifacts matching"):
+            select_artifact(artifacts, name="ilik")
+
     def test_single_artifact_without_filter(self):
         """Should select single artifact with appropriate reason."""
         artifacts = [
@@ -348,6 +368,30 @@ class TestIntegrationScenarios:
         assert result.count == 2
         titles = sorted(a["title"] for a in result.artifacts)
         assert titles == ["Chapter 1", "Chapter 2"]
+
+    @pytest.mark.asyncio
+    async def test_download_all_name_filter_matches_dotted_capital_i(self, tmp_path):
+        """``--all --name istanbul`` keeps an ``İstanbul`` title (issue #2476)."""
+        facade = _make_facade(
+            artifacts=[
+                _make_artifact("a1", "İstanbul notları"),
+                _make_artifact("a2", "Overview"),
+                _make_artifact("a3", "ılık çay"),
+            ],
+        )
+        plan = build_download_plan(
+            _AUDIO_SPEC,
+            {"notebook_id": "nb_1", "download_all": True, "dry_run": True, "name": "istanbul"},
+            cwd=tmp_path,
+        )
+        result = await execute_download(
+            plan,
+            facade,
+            notebook_resolver=_passthrough_notebook_resolver(),
+            artifact_resolver=_artifact_resolver_identity,
+        )
+        assert result.outcome is DownloadOutcome.ALL_DRY_RUN
+        assert [a["title"] for a in result.artifacts] == ["İstanbul notları"]
 
     def test_latest_of_filtered_artifacts_scenario(self):
         """Simulate selecting latest of filtered artifacts."""

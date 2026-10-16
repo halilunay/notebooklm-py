@@ -178,3 +178,42 @@ def test_a_kind_scope_resolves_what_would_otherwise_be_ambiguous() -> None:
 
 def test_an_empty_item_list_matches_nothing() -> None:
     assert _match_studio_ref([], UUID_C, None) is None
+
+
+# --- tiered title matching (issue #2476) -------------------------------------
+
+
+@pytest.mark.parametrize("ref", ["istanbul notları", "ISTANBUL"])
+def test_a_dotted_capital_i_title_matches(ref: str) -> None:
+    items = [_item(UUID_A, "İstanbul notları"), _item(UUID_B, "Other", SLIDE_DECK)]
+
+    assert _match_studio_ref(items, ref, None) == items[0]
+
+
+def test_a_tier1_exact_title_beats_an_accent_insensitive_one() -> None:
+    items = [_item(UUID_A, "Resume"), _item(UUID_B, "Résumé")]
+
+    assert _match_studio_ref(items, "résumé", None) == items[1]
+
+
+def test_two_accent_insensitive_titles_are_surfaced_rather_than_guessed() -> None:
+    items = [_item(UUID_A, "Resume"), _item(UUID_B, "Résumé")]
+
+    with pytest.raises(AmbiguousIdError):
+        _match_studio_ref(items, "Resumé", None)
+
+
+def test_a_unique_title_prefix_now_matches() -> None:
+    """The shared tiered matcher brings title-prefix parity with ``resolve_note``."""
+    items = [_item(UUID_A, "Weekly Report"), _item(UUID_B, "Deck", SLIDE_DECK)]
+
+    assert _match_studio_ref(items, "weekly", None) == items[0]
+
+
+def test_an_ambiguous_title_prefix_is_surfaced() -> None:
+    items = [_item(UUID_A, "Report Q1"), _item(UUID_B, "Report Q2")]
+
+    with pytest.raises(AmbiguousIdError) as caught:
+        _match_studio_ref(items, "Report", None)
+
+    assert "Ambiguous prefix 'Report' matches 2 items" in str(caught.value)

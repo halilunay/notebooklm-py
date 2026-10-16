@@ -264,7 +264,14 @@ These conventions hold across every tool:
 - **Name *or* ID.** Every `notebook`/`source`/`note`/`artifact` argument accepts a human title **or**
   an ID. Both resolve by prefix: an exact title wins, otherwise a **unique title prefix** matches
   (so `"Scientific"` finds `"Scientific PDF Parsing — …"`), and likewise a full ID or a unique ID
-  prefix. Use the matching `*_list` tool to discover them. An ambiguous name or prefix returns a
+  prefix. Use the matching `*_list` tool to discover them. Titles match in tiers: first
+  case-insensitively with accents significant (Unicode canonical caseless matching, so composed and
+  decomposed spellings agree and `"STRASSE"` finds `"Straße"`); only if that finds nothing, the same
+  exact-then-prefix pass runs again ignoring accents, so `"istanbul"` finds `"İstanbul"` and
+  `"cafe"` finds `"Café"`. An earlier tier always wins: with both `"Resume"` and `"Résumé"` present,
+  each spelling resolves to itself. No tier matches `"IĞDIR"` with `"ığdır"`: dotless `ı` stays a
+  distinct letter, since Turkish `I` → `ı` casing needs a Turkish-specific comparison. An ambiguous
+  name or prefix, in any tier, returns a
   `VALIDATION` error listing the candidates so you can retry with an exact title or ID. When a name
   lookup *fails* but is close to a real title — a punctuation-only slip such as a hyphen typed for an
   em-dash (`—`) or a normal space for a non-breaking one — the error's `Did you mean: …` hint names

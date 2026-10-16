@@ -41,6 +41,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   speed: the same 22.8 MB file downloads in about a second. Each range is
   checked against the previous one and the declared total, and a server that
   ignores the range is still read in full.
+- **Title lookups now find `İstanbul` from `istanbul` (#2476).** MCP name
+  resolution (notebooks, sources, notes, artifacts and Studio items) matches
+  in tiers. Tier 1 is Unicode canonical caseless matching, so composed and
+  decomposed spellings now agree. Only when tier 1 finds nothing does an
+  accent-insensitive tier 2 run, and it raises an ambiguity error rather than
+  pick between several titles. The near-miss hints and the download `--name`
+  filter use the accent-insensitive key directly. Studio item refs gain the
+  title-prefix matching the other resolvers already had. Dotless `ı` still
+  never matches `i`.
 
 ## [0.8.5] - 2026-10-12
 
