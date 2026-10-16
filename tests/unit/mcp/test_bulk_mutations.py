@@ -373,3 +373,84 @@ async def test_share_batch_invalid_input_never_opens_client(
     get_client.assert_not_awaited()
     mock_client.sharing.add_user.assert_not_called()
     mock_client.sharing.set_users.assert_not_called()
+
+
+# --- single-item rename and confirmed delete resolve strictly ---------------
+
+
+async def test_studio_delete_preview_still_resolves_a_title_prefix(mcp_call, studio_client):
+    """The preview stays loose and hands back the canonical id to confirm with."""
+    result = await mcp_call("studio_delete", {"notebook": NB, "item": "Fir"})
+    assert result.structured_content["status"] == "needs_confirmation"
+    assert result.structured_content["preview"]["item_id"] == NOTE_A
+    studio_client.notes.delete.assert_not_awaited()
+
+
+@pytest.mark.parametrize("title", ["First", "İstanbul notları"])
+async def test_studio_delete_confirmed_loose_title_is_rejected(mcp_call, studio_client, title):
+    """A confirmed delete by title prefix or accent-insensitive title deletes nothing."""
+    studio_client.notes.list.return_value[0].title = title
+    ref = "Fir" if title == "First" else "istanbul notları"
+    with pytest.raises(ToolError, match="exact title or the id"):
+        await mcp_call("studio_delete", {"notebook": NB, "item": ref, "confirm": True})
+    studio_client.notes.delete.assert_not_awaited()
+    studio_client.artifacts.delete.assert_not_awaited()
+
+
+async def test_studio_rename_title_prefix_is_rejected(mcp_call, studio_client):
+    """Rename has no preview, so a title prefix never picks the item to rename."""
+    studio_client.notes.update = AsyncMock()
+    studio_client.artifacts.rename = AsyncMock()
+    with pytest.raises(ToolError, match="exact title or the id"):
+        await mcp_call("studio_rename", {"notebook": NB, "item": "Fir", "new_title": "New"})
+    studio_client.notes.update.assert_not_awaited()
+    studio_client.artifacts.rename.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    ("tool", "args"),
+    [
+        ("studio_delete", {"item": "Map", "confirm": True}),
+        ("studio_rename", {"item": "Map", "new_title": "New"}),
+    ],
+)
+async def test_single_item_mutation_by_title_needs_a_complete_listing(
+    mcp_call, studio_client, tool, args
+):
+    """A hidden backing cannot make a title look unique to a rename or delete."""
+    studio_client.artifacts.rename = AsyncMock()
+    studio_client.artifacts.list_with_status = AsyncMock(
+        return_value=ArtifactListing(
+            items=(),
+            is_complete=False,
+            failures=(
+                ArtifactListingFailure(
+                    component=ArtifactListingComponent.NOTE_BACKED_MIND_MAPS,
+                    error_type="RPCError",
+                    message="The note-backed mind-map listing is unavailable",
+                ),
+            ),
+        )
+    )
+    with pytest.raises(ToolError, match="Artifact lookup is incomplete"):
+        await mcp_call(tool, {"notebook": NB, **args})
+    studio_client.notes.delete.assert_not_awaited()
+    studio_client.artifacts.delete.assert_not_awaited()
+    studio_client.artifacts.rename.assert_not_awaited()
+
+
+async def test_studio_delete_confirmed_exact_title_still_deletes(mcp_call, studio_client):
+    result = await mcp_call("studio_delete", {"notebook": NB, "item": "first", "confirm": True})
+    assert result.structured_content["status"] == "deleted"
+    assert result.structured_content["item_id"] == NOTE_A
+    studio_client.notes.delete.assert_awaited()
+
+
+async def test_studio_delete_confirmed_full_id_skips_the_completeness_check(
+    mcp_call, studio_client
+):
+    """A canonical id never needs the full listing, so delete-by-id stays available."""
+    studio_client.artifacts.list_with_status = AsyncMock()
+    result = await mcp_call("studio_delete", {"notebook": NB, "item": NOTE_A, "confirm": True})
+    assert result.structured_content["status"] == "deleted"
+    studio_client.artifacts.list_with_status.assert_not_awaited()

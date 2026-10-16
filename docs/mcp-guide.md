@@ -270,9 +270,16 @@ These conventions hold across every tool:
   exact-then-prefix pass runs again ignoring accents, so `"istanbul"` finds `"İstanbul"` and
   `"cafe"` finds `"Café"`. An earlier tier always wins: with both `"Resume"` and `"Résumé"` present,
   each spelling resolves to itself. No tier matches `"IĞDIR"` with `"ığdır"`: dotless `ı` stays a
-  distinct letter, since Turkish `I` → `ı` casing needs a Turkish-specific comparison. An ambiguous
+  distinct letter, since Turkish `I` → `ı` casing needs a Turkish-specific comparison. Ignoring
+  accents also drops vowel and tone marks in scripts such as Thai, Devanagari, Arabic and Hebrew;
+  that tier runs only when tier 1 finds nothing, and several hits are reported as ambiguous. An ambiguous
   name or prefix, in any tier, returns a
-  `VALIDATION` error listing the candidates so you can retry with an exact title or ID. When a name
+  `VALIDATION` error listing the candidates so you can retry with an exact title or ID. `studio_rename`
+  and a confirmed single-item `studio_delete` are stricter, since they change an item with no preview:
+  they accept only an exact tier-1 title (or an id), refuse a title prefix or an accent-insensitive
+  match with a `VALIDATION` error naming the candidates, and refuse a title or prefix ref when the
+  Studio listing is incomplete. The `studio_delete` preview still resolves loosely and returns the
+  canonical item id to confirm with. When a name
   lookup *fails* but is close to a real title — a punctuation-only slip such as a hyphen typed for an
   em-dash (`—`) or a normal space for a non-breaking one — the error's `Did you mean: …` hint names
   up to three near-miss candidates, each with its **title and id** inline, so you can retry with the

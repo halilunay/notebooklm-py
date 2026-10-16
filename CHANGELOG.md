@@ -48,7 +48,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   accent-insensitive tier 2 run, and it raises an ambiguity error rather than
   pick between several titles. The near-miss hints and the download `--name`
   filter use the accent-insensitive key directly. Studio item refs gain the
-  title-prefix matching the other resolvers already had. Dotless `ı` still
+  title-prefix matching the other resolvers already had for lookups and
+  previews; `studio_rename` and a confirmed single-item `studio_delete` still
+  need an exact title or an id, and a complete Studio listing for a title. Dotless `ı` still
   never matches `i`. The confirmation previews of `share_set_access`,
   `share_set_user` and `share_remove_user` now include the resolved notebook
   `title`, as `notebook_delete` already did, so a tier-2 match is visible

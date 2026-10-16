@@ -217,3 +217,41 @@ def test_an_ambiguous_title_prefix_is_surfaced() -> None:
         _match_studio_ref(items, "Report", None)
 
     assert "Ambiguous prefix 'Report' matches 2 items" in str(caught.value)
+
+
+# --- strict title matching for rename and confirmed delete -------------------
+
+
+def test_exact_title_only_accepts_an_exact_title() -> None:
+    items = [_item(UUID_A, "Weekly Report"), _item(UUID_B, "Deck", SLIDE_DECK)]
+
+    assert _match_studio_ref(items, "weekly report", None, exact_title_only=True) == items[0]
+
+
+@pytest.mark.parametrize(
+    ("title", "ref"),
+    [("Weekly Report", "weekly"), ("İstanbul notları", "istanbul notları")],
+)
+def test_exact_title_only_rejects_a_prefix_or_accent_insensitive_match(
+    title: str, ref: str
+) -> None:
+    """A looser match names the candidate instead of mutating it."""
+    items = [_item(UUID_A, title)]
+
+    with pytest.raises(ValidationError, match="exact title or the id") as caught:
+        _match_studio_ref(items, ref, None, exact_title_only=True)
+
+    assert UUID_A in str(caught.value)
+
+
+def test_exact_title_only_surfaces_two_exact_titles() -> None:
+    items = [_item(UUID_A, "Report"), _item(UUID_B, "report", SLIDE_DECK)]
+
+    with pytest.raises(AmbiguousIdError):
+        _match_studio_ref(items, "Report", None, exact_title_only=True)
+
+
+def test_exact_title_only_still_returns_none_on_a_miss() -> None:
+    items = [_item(UUID_A, "Notes")]
+
+    assert _match_studio_ref(items, "Deck", None, exact_title_only=True) is None
