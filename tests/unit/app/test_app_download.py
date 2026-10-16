@@ -191,6 +191,16 @@ class TestArtifactSelection:
         with pytest.raises(ValueError, match="No artifacts matching"):
             select_artifact(artifacts, name="ilik")
 
+    def test_name_filter_combining_marks_only_is_a_miss(self):
+        """A name of only combining marks must not match every title."""
+        artifacts = [
+            {"id": "a1", "title": "First", "created_at": 1000},
+            {"id": "a2", "title": "Second", "created_at": 2000},
+        ]
+
+        with pytest.raises(ValueError, match="No artifacts matching"):
+            select_artifact(artifacts, name="\u0301")
+
     def test_single_artifact_without_filter(self):
         """Should select single artifact with appropriate reason."""
         artifacts = [
@@ -858,6 +868,27 @@ class TestExecuteDownload:
         assert result.failure is not None
         assert result.failure.reason == "name_not_found"
         assert result.failure.name == "nope"
+
+    @pytest.mark.asyncio
+    async def test_all_name_filter_combining_marks_only_errors(self, tmp_path):
+        """``--all --name`` of only combining marks selects nothing, not everything."""
+        facade = _make_facade(
+            artifacts=[_make_artifact("a1", "First"), _make_artifact("a2", "Second")]
+        )
+        plan = build_download_plan(
+            _AUDIO_SPEC,
+            {"notebook_id": "nb_1", "download_all": True, "dry_run": True, "name": "\u0301"},
+            cwd=tmp_path,
+        )
+        result = await execute_download(
+            plan,
+            facade,
+            notebook_resolver=_passthrough_notebook_resolver(),
+            artifact_resolver=_artifact_resolver_identity,
+        )
+        assert result.outcome is DownloadOutcome.ERROR
+        assert result.failure is not None
+        assert result.failure.reason == "name_not_found"
 
     @pytest.mark.asyncio
     async def test_notebook_resolver_is_invoked(self, tmp_path):
