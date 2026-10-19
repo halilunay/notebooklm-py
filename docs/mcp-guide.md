@@ -274,7 +274,7 @@ These conventions hold across every tool:
   accents also drops vowel and tone marks in scripts such as Thai, Devanagari, Arabic and Hebrew;
   that tier runs only when tier 1 finds nothing, and several hits are reported as ambiguous. It
   also applies Unicode compatibility folding, so `"Report 2"` finds `"Report ²"`, `"ABC"` finds
-  `"ＡＢＣ"`, `"file"` finds `"ﬁle report"` and `"iv"` finds `"Ⅳ"`; and since Japanese voicing marks
+  `"ＡＢＣ"` and `"iv"` finds `"Ⅳ"`; and since Japanese voicing marks
   are combining marks, `"ハン"` finds `"パン"` and `"カ"` is a prefix of `"ガイド"`. An ambiguous
   name or prefix, in any tier, returns a
   `VALIDATION` error listing the candidates so you can retry with an exact title or ID. Tools that

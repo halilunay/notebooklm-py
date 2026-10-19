@@ -318,7 +318,7 @@ def _match_studio_ref(
         step = "by title prefix"
         if not loose:
             loose, _ = match_title(ref, scoped, title_of=lambda it: it.get("title"))
-            step = "when ignoring accents"
+            step = "when ignoring accents or Unicode compatibility forms"
         if loose:
             lines = [
                 f"'{ref}' matches only {step}, and renaming or deleting needs the "

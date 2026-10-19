@@ -161,7 +161,8 @@ def _accent_only_error(token: str, matches: Sequence[Any]) -> ValidationError:
     (or the exact title) instead of guessing.
     """
     lines = [
-        f"'{token}' matches only when ignoring accents. Tools that change data need "
+        f"'{token}' matches only when ignoring accents or Unicode compatibility "
+        "forms. Tools that change data need "
         "the exact title, a unique title prefix, or the id. Candidates:"
     ]
     for item in matches[:_MAX_AMBIGUOUS_CANDIDATES]:
