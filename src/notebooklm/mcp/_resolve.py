@@ -31,6 +31,14 @@ no-match (``ValidationError`` from ``resolve_ref``) is re-raised as the
 domain-specific ``*NotFoundError`` so every miss surfaces uniformly as
 ``NOT_FOUND`` regardless of which path produced it.
 
+Tools that change data pass ``strict=True``: the title path
+then accepts only a tier-1 match (canonical caseless exact title, or a unique
+prefix), and a ref that only the accent-insensitive tier would match is refused
+with :class:`ValidationError` naming the candidates, so a typo or a missing accent
+can never rename, delete or share a different item. Reads and confirmation
+previews keep the full tiered match; a preview returns the canonical id to
+confirm with.
+
 Strict IDs-only mode (``NOTEBOOKLM_MCP_STRICT_IDS=1``, off by default) turns every
 resolver below into a full-UUID gate: a name, title, or short id *prefix* is
 rejected with :class:`ValidationError` **before any list call**, so a long-lived
@@ -146,6 +154,23 @@ def _ambiguous_title_error(token: str, matches: Sequence[Any], *, kind: str) -> 
     return AmbiguousIdError(token, candidate_ids, "\n".join(lines))
 
 
+def _accent_only_error(token: str, matches: Sequence[Any]) -> ValidationError:
+    """Refuse a tier-2-only title match on a path that changes data.
+
+    Lists every candidate with its full id, so the caller can retry with the id
+    (or the exact title) instead of guessing.
+    """
+    lines = [
+        f"'{token}' matches only when ignoring accents. Tools that change data need "
+        "the exact title, a unique title prefix, or the id. Candidates:"
+    ]
+    for item in matches[:_MAX_AMBIGUOUS_CANDIDATES]:
+        lines.append(f"  {item.id} {item.title or '(untitled)'}")
+    if len(matches) > _MAX_AMBIGUOUS_CANDIDATES:
+        lines.append(f"  ... and {len(matches) - _MAX_AMBIGUOUS_CANDIDATES} more")
+    return ValidationError("\n".join(lines))
+
+
 def _resolve_by_title(
     token: str,
     items: Sequence[Any],
@@ -153,6 +178,7 @@ def _resolve_by_title(
     not_found: type[
         NotebookNotFoundError | SourceNotFoundError | NoteNotFoundError | ArtifactNotFoundError
     ],
+    strict: bool = False,
 ) -> str:
     """Resolve ``token`` by title over ``items``: exact match wins, else unique prefix.
 
@@ -176,6 +202,11 @@ def _resolve_by_title(
     ``token`` is assumed already stripped and non-empty (callers run
     :func:`~notebooklm._app.resolve.validate_id` first), so an empty prefix
     cannot match every item.
+
+    ``strict`` is for tools that change data: step 3 is skipped, and a ref that
+    only step 3 would match raises :class:`ValidationError` listing the
+    candidates instead of resolving. Steps 1 and 2 (including the unique prefix)
+    still apply, as before tiered matching.
     """
     # Shared tiered matcher (issue #2476): canonical caseless exact, then prefix
     # (issue #1786, so a name is as prefix-resolvable as an id); only on a miss the
@@ -185,12 +216,18 @@ def _resolve_by_title(
     # punctuation-slip token like "Acme - X" for a title "Acme — X" must stay a
     # true miss here so it reaches the near-miss "did you mean" path (#1787) rather
     # than silently resolving to a near match.
-    matches, kind = match_title(token, items, title_of=lambda item: item.title)
+    matches, kind = match_title(
+        token, items, title_of=lambda item: item.title, accent_insensitive=not strict
+    )
     if len(matches) == 1:
         (match,) = matches  # unpack (not matches[0]) — typed items, not an RPC row
         return str(match.id)
     if matches:
         raise _ambiguous_title_error(token, matches, kind=kind or "title")
+    if strict:
+        accent_only, _ = match_title(token, items, title_of=lambda item: item.title)
+        if accent_only:
+            raise _accent_only_error(token, accent_only)
 
     # Neither an exact title nor a unique/ambiguous prefix matched -> a true miss.
     # Enrich it with near-miss "did you mean" candidates (issue #1787): a title
@@ -241,6 +278,7 @@ def _resolve_hex(
     not_found: type[
         NotebookNotFoundError | SourceNotFoundError | NoteNotFoundError | ArtifactNotFoundError
     ],
+    strict: bool = False,
 ) -> str:
     """Resolve a hex-ish ``token``, preferring id/prefix but falling back to title.
 
@@ -264,10 +302,10 @@ def _resolve_hex(
         # The id/prefix path found nothing. Try a title match (exact, then unique
         # prefix) before failing so all-hex titles ("beef", "1234", "DEADBEEF")
         # remain reachable by name.
-        return _resolve_by_title(token, items, not_found=not_found)
+        return _resolve_by_title(token, items, not_found=not_found, strict=strict)
 
 
-async def resolve_notebook(client: NotebookLMClient, ref: str) -> str:
+async def resolve_notebook(client: NotebookLMClient, ref: str, *, strict: bool = False) -> str:
     """Resolve a notebook reference (full/partial id, exact title, or unique title prefix) to its id.
 
     Args:
@@ -275,6 +313,9 @@ async def resolve_notebook(client: NotebookLMClient, ref: str) -> str:
         ref: A full canonical UUID, a hex id prefix, an exact (case-insensitive)
             title, or a unique (case-insensitive) title prefix over the
             notebook list.
+        strict: Set by tools that change data. The title path then refuses a
+            match that only the accent-insensitive tier finds (see
+            :func:`_resolve_by_title`).
 
     Returns:
         The notebook's canonical id.
@@ -291,11 +332,13 @@ async def resolve_notebook(client: NotebookLMClient, ref: str) -> str:
         return ref
     items = await client.notebooks.list()
     if _HEX_ISH.match(ref):
-        return _resolve_hex(ref, items, not_found=NotebookNotFoundError)
-    return _resolve_by_title(ref, items, not_found=NotebookNotFoundError)
+        return _resolve_hex(ref, items, not_found=NotebookNotFoundError, strict=strict)
+    return _resolve_by_title(ref, items, not_found=NotebookNotFoundError, strict=strict)
 
 
-async def resolve_source(client: NotebookLMClient, notebook_id: str, ref: str) -> str:
+async def resolve_source(
+    client: NotebookLMClient, notebook_id: str, ref: str, *, strict: bool = False
+) -> str:
     """Resolve a source reference within a notebook to its id.
 
     Args:
@@ -304,6 +347,9 @@ async def resolve_source(client: NotebookLMClient, notebook_id: str, ref: str) -
         ref: A full canonical UUID, a hex id prefix, an exact (case-insensitive)
             title, or a unique (case-insensitive) title prefix over the
             notebook's source list.
+        strict: Set by tools that change data. The title path then refuses a
+            match that only the accent-insensitive tier finds (see
+            :func:`_resolve_by_title`).
 
     Returns:
         The source's canonical id.
@@ -320,12 +366,12 @@ async def resolve_source(client: NotebookLMClient, notebook_id: str, ref: str) -
         return ref
     items = await client.sources.list(notebook_id)
     if _HEX_ISH.match(ref):
-        return _resolve_hex(ref, items, not_found=SourceNotFoundError)
-    return _resolve_by_title(ref, items, not_found=SourceNotFoundError)
+        return _resolve_hex(ref, items, not_found=SourceNotFoundError, strict=strict)
+    return _resolve_by_title(ref, items, not_found=SourceNotFoundError, strict=strict)
 
 
 async def resolve_sources(
-    client: NotebookLMClient, notebook_id: str, refs: Sequence[str]
+    client: NotebookLMClient, notebook_id: str, refs: Sequence[str], *, strict: bool = False
 ) -> list[str]:
     """Resolve many source references within a notebook, listing sources at most once.
 
@@ -352,6 +398,9 @@ async def resolve_sources(
         client: The lifespan-bound client.
         notebook_id: The (already-resolved) notebook id the sources live in.
         refs: Source references (full/partial id, exact title, or unique title prefix).
+        strict: Set by tools that change data. The title path then refuses a
+            match that only the accent-insensitive tier finds (see
+            :func:`_resolve_by_title`).
 
     Returns:
         The resolved canonical ids, in the same order as ``refs``. An empty
@@ -381,8 +430,8 @@ async def resolve_sources(
         if FULL_ID_PATTERN.fullmatch(ref):
             return ref
         if _HEX_ISH.match(ref):
-            return _resolve_hex(ref, items, not_found=SourceNotFoundError)
-        return _resolve_by_title(ref, items, not_found=SourceNotFoundError)
+            return _resolve_hex(ref, items, not_found=SourceNotFoundError, strict=strict)
+        return _resolve_by_title(ref, items, not_found=SourceNotFoundError, strict=strict)
 
     return [match(ref) for ref in validated]
 
@@ -426,7 +475,9 @@ def partition_source_refs(
     return resolved, not_found
 
 
-async def resolve_note(client: NotebookLMClient, notebook_id: str, ref: str) -> str:
+async def resolve_note(
+    client: NotebookLMClient, notebook_id: str, ref: str, *, strict: bool = False
+) -> str:
     """Resolve a note reference within a notebook to its id.
 
     Same matching rules as :func:`resolve_source`, over the notebook's note list.
@@ -437,6 +488,9 @@ async def resolve_note(client: NotebookLMClient, notebook_id: str, ref: str) -> 
         ref: A full canonical UUID, a hex id prefix, an exact (case-insensitive)
             title, or a unique (case-insensitive) title prefix over the
             notebook's note list.
+        strict: Set by tools that change data. The title path then refuses a
+            match that only the accent-insensitive tier finds (see
+            :func:`_resolve_by_title`).
 
     Returns:
         The note's canonical id.
@@ -453,11 +507,13 @@ async def resolve_note(client: NotebookLMClient, notebook_id: str, ref: str) -> 
         return ref
     items = await client.notes.list(notebook_id)
     if _HEX_ISH.match(ref):
-        return _resolve_hex(ref, items, not_found=NoteNotFoundError)
-    return _resolve_by_title(ref, items, not_found=NoteNotFoundError)
+        return _resolve_hex(ref, items, not_found=NoteNotFoundError, strict=strict)
+    return _resolve_by_title(ref, items, not_found=NoteNotFoundError, strict=strict)
 
 
-async def resolve_artifact(client: NotebookLMClient, notebook_id: str, ref: str) -> str:
+async def resolve_artifact(
+    client: NotebookLMClient, notebook_id: str, ref: str, *, strict: bool = False
+) -> str:
     """Resolve a studio-artifact reference within a notebook to its id.
 
     Same matching rules as :func:`resolve_source`, over the notebook's artifact
@@ -480,6 +536,9 @@ async def resolve_artifact(client: NotebookLMClient, notebook_id: str, ref: str)
         ref: A full canonical UUID, a hex id prefix, an exact (case-insensitive)
             title, or a unique (case-insensitive) title prefix over the
             notebook's artifact list.
+        strict: Set by tools that change data. The title path then refuses a
+            match that only the accent-insensitive tier finds (see
+            :func:`_resolve_by_title`).
 
     Returns:
         The artifact's canonical id.
@@ -498,5 +557,5 @@ async def resolve_artifact(client: NotebookLMClient, notebook_id: str, ref: str)
         return ref
     items = await require_complete_artifact_listing(client, notebook_id)
     if _HEX_ISH.match(ref):
-        return _resolve_hex(ref, items, not_found=ArtifactNotFoundError)
-    return _resolve_by_title(ref, items, not_found=ArtifactNotFoundError)
+        return _resolve_hex(ref, items, not_found=ArtifactNotFoundError, strict=strict)
+    return _resolve_by_title(ref, items, not_found=ArtifactNotFoundError, strict=strict)

@@ -54,7 +54,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   never matches `i`. The confirmation previews of `share_set_access`,
   `share_set_user` and `share_remove_user` now include the resolved notebook
   `title`, as `notebook_delete` already did, so a tier-2 match is visible
-  before anything changes.
+  before anything changes; if the notebook list cannot be read, the preview
+  shows `title: null` instead of failing. Tools that change data (renames,
+  saves, adds, generation, research, chat settings, sharing changes, and
+  confirmed deletes) use tier 1 only: a ref that only the accent-insensitive
+  tier would match returns a `VALIDATION` error naming the candidates, where
+  it was `NOT_FOUND` with a "Did you mean" hint before. Read-only tools and
+  confirmation previews keep both tiers.
 
 ## [0.8.5] - 2026-10-12
 

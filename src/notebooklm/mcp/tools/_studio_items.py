@@ -310,11 +310,19 @@ def _match_studio_ref(
             return match
         if len(exact) > 1:
             _ambiguous_studio_title(ref, "title", exact)
-        loose, how = match_title(ref, scoped, title_of=lambda it: it.get("title"))
+        # Say which looser step found the candidates: a tier-1 title prefix, or
+        # (only when tier 1 finds nothing) the accent-insensitive tier.
+        loose, _ = match_title(
+            ref, scoped, title_of=lambda it: it.get("title"), accent_insensitive=False
+        )
+        step = "by title prefix"
+        if not loose:
+            loose, _ = match_title(ref, scoped, title_of=lambda it: it.get("title"))
+            step = "when ignoring accents"
         if loose:
             lines = [
-                f"'{ref}' matches only by {how} (or ignoring accents), and renaming or "
-                "deleting needs the exact title or the id. Candidates:"
+                f"'{ref}' matches only {step}, and renaming or deleting needs the "
+                "exact title or the id. Candidates:"
             ]
             for it in loose[:_MAX_AMBIGUOUS_CANDIDATES]:
                 lines.append(f"  {it['id']} {it.get('title') or '(untitled)'}")

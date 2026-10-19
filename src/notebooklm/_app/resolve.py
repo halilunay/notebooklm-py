@@ -211,6 +211,7 @@ def match_title(
     items: Iterable[Any],
     *,
     title_of: Callable[[Any], str | None],
+    accent_insensitive: bool = True,
 ) -> tuple[list[Any], str | None]:
     """Return the items whose title matches ``token``, and how they matched.
 
@@ -223,9 +224,18 @@ def match_title(
     reported as ambiguous, never resolved silently). An item without a title keys
     to ``""``. A token whose key is empty never prefix-matches, and a non-empty
     token that folds to ``""`` (only combining marks) skips that tier.
+
+    ``accent_insensitive=False`` runs tier 1 only, for callers that change data
+    and must not act on an accent-insensitive guess.
+
+    The tier-1 prefix step compares NFC strings, so a combining mark with no
+    precomposed form stays a separate character: ``"i"`` prefix-matches
+    ``"İstanbul"``, because ``İ`` folds to ``i`` + U+0307, while ``"istanbul"``
+    does not.
     """
     titled = [(title_of(item) or "", item) for item in items]
-    for key in (caseless_key, accentless_key):
+    keys = (caseless_key, accentless_key) if accent_insensitive else (caseless_key,)
+    for key in keys:
         token_key = key(token)
         if token and not token_key:
             continue

@@ -272,14 +272,22 @@ These conventions hold across every tool:
   each spelling resolves to itself. No tier matches `"IĞDIR"` with `"ığdır"`: dotless `ı` stays a
   distinct letter, since Turkish `I` → `ı` casing needs a Turkish-specific comparison. Ignoring
   accents also drops vowel and tone marks in scripts such as Thai, Devanagari, Arabic and Hebrew;
-  that tier runs only when tier 1 finds nothing, and several hits are reported as ambiguous. An ambiguous
+  that tier runs only when tier 1 finds nothing, and several hits are reported as ambiguous. It
+  also applies Unicode compatibility folding, so `"Report 2"` finds `"Report ²"`, `"ABC"` finds
+  `"ＡＢＣ"`, `"file"` finds `"ﬁle report"` and `"iv"` finds `"Ⅳ"`; and since Japanese voicing marks
+  are combining marks, `"ハン"` finds `"パン"` and `"カ"` is a prefix of `"ガイド"`. An ambiguous
   name or prefix, in any tier, returns a
-  `VALIDATION` error listing the candidates so you can retry with an exact title or ID. `studio_rename`
-  and a confirmed single-item `studio_delete` are stricter, since they change an item with no preview:
-  they accept only an exact tier-1 title (or an id), refuse a title prefix or an accent-insensitive
-  match with a `VALIDATION` error naming the candidates, and refuse a title or prefix ref when the
-  Studio listing is incomplete. The `studio_delete` preview still resolves loosely and returns the
-  canonical item id to confirm with. When a name
+  `VALIDATION` error listing the candidates so you can retry with an exact title or ID. Tools that
+  change data use tier 1 only: a rename, `note_save`, a source add, `studio_generate`,
+  `studio_retry`, `research_start` / `research_import` / `research_cancel`, `chat_configure`,
+  `chat_cancel`, an ungated `share_set_access`, and any delete or sharing call with
+  `confirm=True` accept an exact title, a unique title prefix or an ID, and refuse a ref that only
+  the accent-insensitive tier would match with a `VALIDATION` error naming the candidates.
+  Confirmation previews (`confirm=False`) and read-only tools, including `chat_ask`, keep every
+  tier, and a preview returns the canonical id to confirm with. `studio_rename` and a confirmed
+  single-item `studio_delete` are stricter still: they accept only an exact tier-1 title (or an
+  id), also refuse a title prefix, and refuse a title or prefix ref when the Studio listing is
+  incomplete. When a name
   lookup *fails* but is close to a real title — a punctuation-only slip such as a hyphen typed for an
   em-dash (`—`) or a normal space for a non-breaking one — the error's `Did you mean: …` hint names
   up to three near-miss candidates, each with its **title and id** inline, so you can retry with the
