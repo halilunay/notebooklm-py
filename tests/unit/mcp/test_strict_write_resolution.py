@@ -224,6 +224,32 @@ async def test_share_set_access_on_an_already_public_notebook_writes_so_it_is_st
     mock_client.sharing.set_view_level.assert_not_called()
 
 
+async def test_share_set_access_refuses_when_the_strict_recheck_finds_another_notebook(
+    mcp_call, mock_client
+) -> None:
+    """The strict re-check must confirm the notebook already read, not just any match.
+
+    A notebook titled "resume" appears between the two list reads, so the strict
+    lookup resolves to it while the status read and the writes would target the
+    accent-only "Résumé".
+    """
+    mock_client.notebooks.list = AsyncMock(
+        side_effect=[
+            [Titled(NB_ID, "Résumé")],
+            [Titled(NB_ID, "Résumé"), Titled(NB2_ID, "resume")],
+        ]
+    )
+    mock_client.sharing.get_status = AsyncMock(return_value=SimpleNamespace(is_public=True))
+    mock_client.sharing.set_public = AsyncMock()
+    mock_client.sharing.set_view_level = AsyncMock()
+    with pytest.raises(ToolError, match="different notebook"):
+        await mcp_call(
+            "share_set_access", {"notebook": "resume", "public": True, "view_level": "chat"}
+        )
+    mock_client.sharing.set_public.assert_not_called()
+    mock_client.sharing.set_view_level.assert_not_called()
+
+
 # ---------------------------------------------------------------------------
 # Source and note refs on tools that change data
 # ---------------------------------------------------------------------------

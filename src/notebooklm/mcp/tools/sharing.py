@@ -140,8 +140,14 @@ def register(mcp: Any) -> None:
                         preview["view_level"] = view_level
                     return needs_confirmation(preview)
                 # Already public: no preview, so this call writes after all. Hold the
-                # ref to the strict match every write needs.
-                await resolve_notebook(client, notebook, strict=True)
+                # ref to the strict match every write needs, and to the notebook whose
+                # status was just read: a rename or new notebook between the two list
+                # reads could make the strict lookup land on a different one.
+                if await resolve_notebook(client, notebook, strict=True) != nb_id:
+                    raise ValidationError(
+                        f"'{notebook}' resolved to a different notebook on the strict "
+                        "re-check, so nothing was changed. Retry with the notebook id."
+                    )
             # Apply the (possibly restricting) view_level BEFORE toggling public, so a
             # failure on the public step can never leave the notebook public with a
             # wider view level than intended (fail-closed). set_view_level's return is
