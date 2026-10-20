@@ -39,6 +39,8 @@ NB2_ID = "22222222-2222-2222-2222-222222222222"
 SRC_ID = "33333333-3333-3333-3333-333333333333"
 NOTE_ID = "44444444-4444-4444-4444-444444444444"
 ITEM_ID = "55555555-5555-4555-8555-555555555555"
+#: Has hex letters, so its uppercase spelling differs from the listed id.
+HEX_NB_ID = "abcdef12-3456-4789-abcd-ef1234567890"
 
 ACCENT_ONLY = "only when ignoring accents"
 
@@ -315,6 +317,41 @@ async def test_sharing_preview_survives_a_failed_title_read(
     assert result.structured_content["preview"]["notebook_id"] == NB_ID
     assert result.structured_content["preview"]["title"] is None
     getattr(mock_client.sharing, mutation).assert_not_called()
+
+
+@pytest.mark.parametrize(("tool", "args", "mutation"), SHARING_PREVIEWS)
+async def test_sharing_preview_finds_the_title_for_an_uppercase_full_uuid(
+    mcp_call, mock_client, tool: str, args: dict[str, Any], mutation: str
+) -> None:
+    """A full UUID is accepted in any case, while the list returns lowercase ids."""
+    mock_client.notebooks.list = AsyncMock(return_value=[Titled(HEX_NB_ID, "Résumé")])
+    mock_client.sharing.get_status = AsyncMock(return_value=SimpleNamespace(is_public=False))
+    setattr(mock_client.sharing, mutation, AsyncMock())
+    result = await mcp_call(tool, {"notebook": HEX_NB_ID.upper(), **args})
+    assert result.structured_content["status"] == "needs_confirmation"
+    assert result.structured_content["preview"]["title"] == "Résumé"
+    getattr(mock_client.sharing, mutation).assert_not_called()
+
+
+async def test_delete_preview_finds_the_title_for_an_uppercase_full_uuid(
+    mcp_call, mock_client
+) -> None:
+    """``title_for_id`` is shared, so the delete preview gets the same fix."""
+    mock_client.notebooks.list = AsyncMock(return_value=[Titled(HEX_NB_ID, "Résumé")])
+    mock_client.notebooks.delete = AsyncMock(return_value=None)
+    result = await mcp_call("notebook_delete", {"notebook": HEX_NB_ID.upper()})
+    assert result.structured_content["preview"]["title"] == "Résumé"
+    mock_client.notebooks.delete.assert_not_called()
+
+
+async def test_source_delete_preview_finds_the_title_for_an_uppercase_full_uuid(
+    mcp_call, mock_client
+) -> None:
+    mock_client.sources.list = AsyncMock(return_value=[Titled(HEX_NB_ID, "Résumé")])
+    mock_client.sources.delete = AsyncMock()
+    result = await mcp_call("source_delete", {"notebook": NB_ID, "source": HEX_NB_ID.upper()})
+    assert result.structured_content["preview"]["title"] == "Résumé"
+    mock_client.sources.delete.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

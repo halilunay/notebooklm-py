@@ -28,10 +28,14 @@ logger = logging.getLogger(__name__)
 def title_for_id(items: Sequence[Any], target_id: str) -> str | None:
     """Return the title of the item whose id equals ``target_id``, else ``None``.
 
+    Ids compare case-insensitively: a full UUID ref is accepted in any case and
+    passed through verbatim, while lists return canonical lowercase ids.
+
     Best-effort: a miss (the resource vanished between resolution and this lookup)
     yields ``None`` rather than raising, so the delete preview still renders.
     """
-    return next((item.title for item in items if str(item.id) == target_id), None)
+    key = target_id.casefold()
+    return next((item.title for item in items if str(item.id).casefold() == key), None)
 
 
 async def notebook_title_or_none(client: NotebookLMClient, notebook_id: str) -> str | None:
