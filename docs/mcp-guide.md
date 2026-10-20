@@ -283,11 +283,13 @@ These conventions hold across every tool:
   `chat_cancel`, an ungated `share_set_access`, and any delete or sharing call with
   `confirm=True` accept an exact title, a unique title prefix or an ID, and refuse a ref that only
   the accent-insensitive tier would match with a `VALIDATION` error naming the candidates.
-  Confirmation previews (`confirm=False`) and read-only tools, including `chat_ask`, keep every
-  tier, and a preview returns the canonical id to confirm with. `studio_rename` and a confirmed
+  Confirmation previews (`confirm=False`), read-only tools, and `chat_ask` / `chat_start` (they
+  add a conversation turn but change no notebook content) keep every tier, and a preview returns
+  the canonical id to confirm with. `studio_rename` and a confirmed
   single-item `studio_delete` are stricter still: they accept only an exact tier-1 title (or an
   id), also refuse a title prefix, and refuse a title or prefix ref when the Studio listing is
-  incomplete. When a name
+  incomplete. So `source_rename(source="Rep")` renames the one source whose title starts with
+  `"Rep"`, while `studio_rename(item="Rep")` refuses and lists the candidates. When a name
   lookup *fails* but is close to a real title — a punctuation-only slip such as a hyphen typed for an
   em-dash (`—`) or a normal space for a non-breaking one — the error's `Did you mean: …` hint names
   up to three near-miss candidates, each with its **title and id** inline, so you can retry with the

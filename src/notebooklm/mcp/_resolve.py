@@ -109,6 +109,10 @@ _MAX_AMBIGUOUS_CANDIDATES = 5
 #: ``NOTEBOOKLM_MCP_TRUST_PROXY`` / ``NOTEBOOKLM_MCP_ALLOW_EXTERNAL_BIND``.
 STRICT_IDS_ENV = "NOTEBOOKLM_MCP_STRICT_IDS"
 
+#: How a strict-path error names the accent-insensitive tier, shared with the
+#: Studio resolver so the two messages cannot drift.
+ACCENT_ONLY_STEP = "when ignoring accents or Unicode compatibility forms"
+
 
 def _strict_ids_enabled() -> bool:
     """Return whether strict IDs-only mode is enabled.
@@ -161,8 +165,7 @@ def _accent_only_error(token: str, matches: Sequence[Any]) -> ValidationError:
     (or the exact title) instead of guessing.
     """
     lines = [
-        f"'{token}' matches only when ignoring accents or Unicode compatibility "
-        "forms. Tools that change data need "
+        f"'{token}' matches only {ACCENT_ONLY_STEP}. Tools that change data need "
         "the exact title, a unique title prefix, or the id. Candidates:"
     ]
     for item in matches[:_MAX_AMBIGUOUS_CANDIDATES]:

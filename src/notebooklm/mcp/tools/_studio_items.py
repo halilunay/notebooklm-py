@@ -33,7 +33,7 @@ from ..._app.resolve import (
 from ..._app.serialize import to_jsonable
 from ...exceptions import NotFoundError, ValidationError
 from ...types import ArtifactType
-from .._resolve import reject_non_canonical_id
+from .._resolve import ACCENT_ONLY_STEP, reject_non_canonical_id
 
 if TYPE_CHECKING:
     from ...client import NotebookLMClient
@@ -318,7 +318,7 @@ def _match_studio_ref(
         step = "by title prefix"
         if not loose:
             loose, _ = match_title(ref, scoped, title_of=lambda it: it.get("title"))
-            step = "when ignoring accents or Unicode compatibility forms"
+            step = ACCENT_ONLY_STEP
         if loose:
             lines = [
                 f"'{ref}' matches only {step}, and renaming or deleting needs the "
