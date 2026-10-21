@@ -28,6 +28,7 @@ from notebooklm.exceptions import (  # noqa: E402 - after importorskip guard
     ValidationError,
 )
 from notebooklm.mcp._resolve import _resolve_by_title  # noqa: E402 - after importorskip guard
+from notebooklm.mcp.tools._preview import title_for_id  # noqa: E402 - after importorskip guard
 from notebooklm.mcp.tools._studio_items import (  # noqa: E402 - after importorskip guard
     _match_studio_ref,
 )
@@ -352,6 +353,42 @@ async def test_source_delete_preview_finds_the_title_for_an_uppercase_full_uuid(
     result = await mcp_call("source_delete", {"notebook": NB_ID, "source": HEX_NB_ID.upper()})
     assert result.structured_content["preview"]["title"] == "Résumé"
     mock_client.sources.delete.assert_not_called()
+
+
+async def test_source_delete_preview_prefers_the_exact_id_over_a_case_variant(
+    mcp_call, mock_client
+) -> None:
+    """Two ids that differ only in case are different items; the exact one wins."""
+    mock_client.sources.list = AsyncMock(
+        return_value=[Titled(HEX_NB_ID.upper(), "Upper"), Titled(HEX_NB_ID, "Lower")]
+    )
+    mock_client.sources.delete = AsyncMock()
+    result = await mcp_call("source_delete", {"notebook": NB_ID, "source": HEX_NB_ID})
+    assert result.structured_content["preview"]["title"] == "Lower"
+    mock_client.sources.delete.assert_not_called()
+
+
+def test_title_for_id_prefers_the_exact_id() -> None:
+    items = [Titled("src-A", "first"), Titled("src-a", "second")]
+    assert title_for_id(items, "src-a") == "second"
+
+
+def test_title_for_id_compares_a_non_uuid_id_exactly() -> None:
+    assert title_for_id([Titled("abc", "x")], "ABC") is None
+
+
+def test_title_for_id_matches_a_full_uuid_in_any_case() -> None:
+    assert title_for_id([Titled(HEX_NB_ID, "x")], HEX_NB_ID.upper()) == "x"
+
+
+@pytest.mark.parametrize("ref", ["{" + HEX_NB_ID.upper() + "}", HEX_NB_ID.upper().replace("-", "")])
+def test_title_for_id_folds_case_only_for_the_hyphenated_uuid_form(ref: str) -> None:
+    assert title_for_id([Titled(HEX_NB_ID, "x")], ref) is None
+
+
+def test_title_for_id_keeps_an_exact_match_without_a_title() -> None:
+    items = [Titled(HEX_NB_ID.upper(), "Upper"), Titled(HEX_NB_ID, None)]
+    assert title_for_id(items, HEX_NB_ID) is None
 
 
 # ---------------------------------------------------------------------------

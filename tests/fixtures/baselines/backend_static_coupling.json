@@ -10211,7 +10211,7 @@
     },
     {
       "kind": "from",
-      "lineno": 21,
+      "lineno": 22,
       "scope": null,
       "scope_kind": "module",
       "source": "notebooklm.mcp.tools._preview",
@@ -11875,7 +11875,7 @@
       "modules": 76
     },
     "mcp": {
-      "lines": 12169,
+      "lines": 12189,
       "modules": 42
     },
     "root": {
@@ -11904,7 +11904,7 @@
     }
   },
   "summary": {
-    "authored_lines": 154770,
+    "authored_lines": 154790,
     "authored_modules": 494,
     "class_local_edges": 0,
     "cross_subsystem_edges": 1306,

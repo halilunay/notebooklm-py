@@ -16,6 +16,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
+from uuid import UUID
 
 if TYPE_CHECKING:
     from ...client import NotebookLMClient
@@ -25,17 +26,36 @@ __all__ = ["notebook_title_or_none", "title_for_id"]
 logger = logging.getLogger(__name__)
 
 
+def _is_full_uuid(value: str) -> bool:
+    """Whether ``value`` is a hyphenated 36-character UUID, in any case."""
+    try:
+        return str(UUID(value)) == value.casefold()
+    except ValueError:
+        return False
+
+
 def title_for_id(items: Sequence[Any], target_id: str) -> str | None:
     """Return the title of the item whose id equals ``target_id``, else ``None``.
 
-    Ids compare case-insensitively: a full UUID ref is accepted in any case and
-    passed through verbatim, while lists return canonical lowercase ids.
+    Ids compare exactly; a full UUID ref also matches case-insensitively. The
+    resolver passes a full UUID through verbatim in any case, while lists return
+    canonical lowercase ids.
 
     Best-effort: a miss (the resource vanished between resolution and this lookup)
     yields ``None`` rather than raising, so the delete preview still renders.
     """
-    key = target_id.casefold()
-    return next((item.title for item in items if str(item.id).casefold() == key), None)
+    match = next((item for item in items if str(item.id) == target_id), None)
+    if match is None and _is_full_uuid(target_id):
+        key = target_id.casefold()
+        match = next(
+            (
+                item
+                for item in items
+                if _is_full_uuid(str(item.id)) and str(item.id).casefold() == key
+            ),
+            None,
+        )
+    return None if match is None else match.title
 
 
 async def notebook_title_or_none(client: NotebookLMClient, notebook_id: str) -> str | None:
