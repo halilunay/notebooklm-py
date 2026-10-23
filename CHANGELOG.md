@@ -66,8 +66,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   shows `title: null` instead of failing. These previews, and those of
   `notebook_delete` and a single-source `source_delete`, reuse the list read
   to resolve a name instead of listing again; the two delete previews also
-  show `title: null` when the list cannot be read. Preview titles are now also
-  found when the ref is a full id in uppercase. Tools that change data (renames,
+  show `title: null` when a full-id preview cannot read the list (with a
+  name, resolution fails first). Preview titles are now also found when the
+  ref is a full id in uppercase. Tools that change data (renames,
   saves, adds, generation, research, chat settings, sharing changes, and
   confirmed deletes) use tier 1 only: a ref that only the accent-insensitive
   tier would match returns a `VALIDATION` error naming the candidates, where
